@@ -369,28 +369,36 @@ class Huawei extends APayment
     public function notify()
     {
         try {
-            $notifyData = $this->getNotifyData();
-            if (empty($notifyData)) {
-                throw new \InvalidArgumentException('异步通知数据为空');
-            }
-            if (!isset($notifyData['jwsNotification'])) {
-                throw new \InvalidArgumentException('JWS数据不存在');
-            }
-            if (!is_string($notifyData['jwsNotification'])) {
-                throw new \InvalidArgumentException('JWS数据格式错误');
-            }
-            $this->payloadData = $this->getJwtService()->decodedSignedData($notifyData['jwsNotification']);
-            $notificationType = $this->payloadData['notificationType'] ?? '';
-            $subtype = $this->payloadData['notificationSubtype'] ?? '';
-            $notifyCallback = $this->getServerNotify($notificationType, $subtype);
-            if (!($notifyCallback instanceof INotify)) {
-                throw new \InvalidArgumentException('未找到对应的通知处理器');
-            }
-            $result = $notifyCallback->handle(self::SP_NAME, $this->payloadData);
+            $result = $this->notifyWithResult();
             exit(Response::notify($result));
         } catch (\Exception $e) {
             exit(Response::notify(false));
         }
+    }
+
+    /**
+     * @return mixed
+     */
+    public function notifyWithResult()
+    {
+        $notifyData = $this->getNotifyData();
+        if (empty($notifyData)) {
+            throw new \InvalidArgumentException('异步通知数据为空');
+        }
+        if (!isset($notifyData['jwsNotification'])) {
+            throw new \InvalidArgumentException('JWS数据不存在');
+        }
+        if (!is_string($notifyData['jwsNotification'])) {
+            throw new \InvalidArgumentException('JWS数据格式错误');
+        }
+        $this->payloadData = $this->getJwtService()->decodedSignedData($notifyData['jwsNotification']);
+        $notificationType = $this->payloadData['notificationType'] ?? '';
+        $subtype = $this->payloadData['notificationSubtype'] ?? '';
+        $notifyCallback = $this->getServerNotify($notificationType, $subtype);
+        if (!($notifyCallback instanceof INotify)) {
+            throw new \InvalidArgumentException('未找到对应的通知处理器');
+        }
+        return $notifyCallback->handle(self::SP_NAME, $this->payloadData);
     }
 
     /**

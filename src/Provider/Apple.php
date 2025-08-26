@@ -734,6 +734,19 @@ class Apple extends APayment
      */
     public function notify()
     {
+        try {
+            $result = $this->notifyWithResult();
+            exit(Response::notify($result));
+        } catch (\Exception $e) {
+            exit(Response::notify(false));
+        }
+    }
+
+    /**
+     * @return mixed
+     */
+    public function notifyWithResult()
+    {
         $notifyData = $this->getNotifyData();
         if (empty($notifyData)) {
             throw new \InvalidArgumentException('异步通知数据为空');
@@ -744,28 +757,25 @@ class Apple extends APayment
         if (!is_string($notifyData['signedPayload'])) {
             throw new \InvalidArgumentException('JWS数据格式错误');
         }
-        try {
-            $this->payloadData = $this->getJwtService()->decodedSignedData($notifyData['signedPayload']);
-            $notificationType = $this->payloadData['notificationType'] ?? '';
-            $subtype = $this->payloadData['subtype'] ?? '';
-            $notifyCallback = $this->getServerNotify($notificationType, $subtype);
-            if (!($notifyCallback instanceof INotify)) {
-                throw new \InvalidArgumentException('未找到对应的通知处理器');
-            }
-            // 如果存在payload->data->signedRenewalInfo|signedTransactionInfo，需要解析
-            // @link https://developer.apple.com/documentation/appstoreservernotifications/jwsrenewalinfodecodedpayload
-            if (isset($this->payloadData['data']['signedRenewalInfo'])) {
-                $this->payloadData['data']['signedRenewalInfo'] = $this->getJwtService()->decodedSignedData($this->payloadData['data']['signedRenewalInfo']);
-            }
-            // @link https://developer.apple.com/documentation/appstoreservernotifications/jwstransactiondecodedpayload
-            if (isset($this->payloadData['data']['signedTransactionInfo'])) {
-                $this->payloadData['data']['signedTransactionInfo'] = $this->getJwtService()->decodedSignedData($this->payloadData['data']['signedTransactionInfo']);
-            }
-            $result = $notifyCallback->handle(self::SP_NAME, $this->payloadData);
-            exit(Response::notify($result));
-        } catch (\Exception $e) {
-            exit(Response::notify(false));
+
+        $this->payloadData = $this->getJwtService()->decodedSignedData($notifyData['signedPayload']);
+        $notificationType = $this->payloadData['notificationType'] ?? '';
+        $subtype = $this->payloadData['subtype'] ?? '';
+        $notifyCallback = $this->getServerNotify($notificationType, $subtype);
+        if (!($notifyCallback instanceof INotify)) {
+            throw new \InvalidArgumentException('未找到对应的通知处理器');
         }
+        // 如果存在payload->data->signedRenewalInfo|signedTransactionInfo，需要解析
+        // @link https://developer.apple.com/documentation/appstoreservernotifications/jwsrenewalinfodecodedpayload
+        if (isset($this->payloadData['data']['signedRenewalInfo'])) {
+            $this->payloadData['data']['signedRenewalInfo'] = $this->getJwtService()->decodedSignedData($this->payloadData['data']['signedRenewalInfo']);
+        }
+        // @link https://developer.apple.com/documentation/appstoreservernotifications/jwstransactiondecodedpayload
+        if (isset($this->payloadData['data']['signedTransactionInfo'])) {
+            $this->payloadData['data']['signedTransactionInfo'] = $this->getJwtService()->decodedSignedData($this->payloadData['data']['signedTransactionInfo']);
+        }
+
+        return $notifyCallback->handle(self::SP_NAME, $this->payloadData);
     }
 
     /**
