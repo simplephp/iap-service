@@ -141,6 +141,9 @@ class JwtAuthorizationMiddleware
         if ($resource === false) {
             throw new \InvalidArgumentException('Private key certificate error');
         }
-        openssl_free_key($resource);
+
+        if (version_compare(PHP_VERSION, '8.0.0', '<') && function_exists('openssl_free_key')) {
+            openssl_free_key($resource);
+        }
     }
 }
